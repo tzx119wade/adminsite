@@ -111,7 +111,9 @@ def adduser(request):
                     # 创建user对象
                     user = User.objects.create_user(username=username, password=password, email=email)
                     # 创建 userprofile 对象
-                    userprofile = UserProfile.objects.create(belong_to=user,identity=identity,nick_name=username)
+                    # 默认头像
+                    profile_image = "https://cdn.sspai.com/user/725653_1488337112561.png?imageMogr2/quality/95/thumbnail/!120x120r/gravit"
+                    userprofile = UserProfile.objects.create(belong_to=user,identity=identity,nick_name=username,profile_image=profile_image)
                     # 返回成功
                     return Response(serializers.data, status=status.HTTP_201_CREATED)
 
