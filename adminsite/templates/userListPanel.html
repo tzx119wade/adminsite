@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title></title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.6/semantic.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.5.2/animate.css" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/1.0.28/vue.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/reqwest/2.0.5/reqwest.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.1.3/js.cookie.js"></script>
+
+        <style media="screen">
+            body {
+                padding-top: 40px;
+            }
+            .ui.very.padded.userlist.container {
+                padding-top: 50px;
+            }
+            .ui.fixed.something.menu {
+                position: fixed;top:50px;
+            }
+            .unscrollable{
+                height:100%;
+                overflow:hidden;
+            }
+            .ui.padded.modal.active {
+                transform: translate(0, -50%);
+            }
+            .ui.vertical.inverted.background.segment {
+                height: 260px;
+                background-size: cover;
+            }
+
+            .shortcut.buttons{
+                position: absolute;top:15px;left:15px;
+            }
+
+
+
+        </style>
+    </head>
+    {% verbatim %}
+    <body id="app" class="dimmable {{ canScroll }} ">
+        <!--导航栏-->
+        <div  class="ui fixed inverted red borderless menu">
+            <div  v-on:click="showMenu = !showMenu" class="header item">
+                10MINs
+            </div>
+
+            <div class="right menu">
+                <div class="item">
+                    <button v-on:click="LoginOrNot" class="ui tiny inverted circular button" type="button" name=""> {{ loginOrNot }} </button>
+                </div>
+            </div>
+        </div>
+
+        <!--操作前的提示窗口-->
+        <div class="ui dimmer animated {{ modal_fade }} active" v-if="case_1">
+          <div class="ui padded modal segment active">
+            <h3 class="ui center aligned header">{{ msg_title }}</h3>
+            <div class="content" style="color:grey">
+              <p>{{ msg_description }}</p>
+            </div>
+            <!--点击调用接口-->
+            <div class="ui right floated red button" v-on:click="action_api(profile_id)">
+              YES
+            </div>
+            <!--取消显示modal-->
+            <div class="ui right floated button" v-on:click="case_1 = !case_1">
+              NO
+            </div>
+          </div>
+        </div>
+
+        <!--操作后的提示窗口-->
+        <div class="ui dimmer animated  active" v-if="case_2">
+          <div class="ui padded modal segment active">
+            <h3 class="ui center aligned header">Operation is ok, haha~</h3>
+
+            <!--取消显示-->
+            <div class="ui right floated red button" v-on:click="action_result">
+              YES
+            </div>
+
+          </div>
+        </div>
+
+        <!--添加新用户的窗口-->
+        <div v-show="modal.show" class="ui dimmer animated fadeIn active" v-if="modal.show">
+            <div class="ui padded  modal {{ loadingOrNot }} segment active">
+                <h3 class="ui center aligned header">Add new user</h3>
+                <i v-on:click="modalSwitch" class="icon tiny close" ></i>
+
+                <div class="content">
+                    <form class="ui form " >
+                        <div class="field">
+                            <input type="text" placeholder="username" v-model="new_user.username">
+                        </div>
+                        <div class="field">
+                            <input  type="text" placeholder="password" v-model="new_user.password">
+                        </div>
+                        <div class="field">
+                            <input type="text" placeholder="email" v-model="new_user.email">
+                        </div>
+
+                    </form>
+                    <!--checkbox-->
+                    <div class="ui form">
+                      <div class="grouped fields">
+                        <label>Choose user's identity</label>
+                        <div class="field">
+                          <div class="ui radio checkbox">
+                            <input type="radio" name="example2" checked="checked" value="normal" v-model="new_user.identity">
+                            <label>normal</label>
+                          </div>
+                        </div>
+                        <div class="field">
+                          <div class="ui radio checkbox">
+                            <input type="radio" name="example2" value="author" v-model="new_user.identity">
+                            <label>author</label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                </div>
+                <div class="ui fluid positive  button" v-on:click="add_new_user">Submit</div>
+            </div>
+
+        </div>
+
+        <!-- 用户列表 -->
+        <div class="ui very padded userlist container">
+            <div class="ui big header">Operation</div>
+            <!--根据登录状态，响应按钮是否可以点击-->
+            <button v-on:click="modal.show = !modal.show" class="ui {{ ActiveOrDisabled }} tiny circular button" type="button" ><i class="icon plus"></i>NEW USER</button>
+
+            <div class="ui divider"></div>
+            <div class="ui big header">{{ user_list.length }} user in the list</div>
+            <div class="ui very selection relaxed animated list">
+
+              <template v-for="item in user_list">
+                <div class="item" v-on:click="showDetail(item.id)">
+                    <img class="ui avatar image" v-bind:src="item.profile_image">
+                    <div class="content">
+                        <a class="header">{{ item.nick_name }}</a>
+                        <span href="sub header" v-if="item.identity">{{ item.identity }}</span>
+                        <!--根据is_active属性来响应图标是否显示-->
+                        <i class="ui warning circle icon" style="margin-left:10px" v-if="!item.belong_to.is_active"></i>
+
+                        <span v-if="item.menushow" class="description">
+                            <div class="ui divider"></div>
+                            <div class="ui label" v-on:click.stop="action_modal(1,item.id)">
+                                DELETE
+                            </div>
+
+                            <div class="ui label" v-on:click.stop="action_modal(2,item.id)">
+                                Invited Author
+                            </div>
+
+                            <div class="ui label" v-on:click.stop="action_modal(3,item.id)">
+                                Ban this user
+                            </div>
+                        </span>
+                    </div>
+                    <div class="right floated content">
+                        <i v-on:click.stop="item.menushow = !item.menushow" class="icon ellipsis vertical"></i>
+                    </div>
+                </div>
+              </template>
+
+
+
+            </div>
+        </div>
+
+
+
+        <script>
+            vm = new Vue({
+                el:"#app",
+                data:{
+                    modal:{
+                        show:false,
+                    },
+                    LOGIN : false,
+                    user_list:[],
+                    new_user : {
+                        username:'',
+                        password:'',
+                        email:'',
+                        identity:'',
+                    },
+                    case_1 : false,
+                    case_2 : false,
+
+                    alert_title : {
+                        delete : 'Delete the user ?',
+                        invited : 'Invited the user?',
+                        ban : 'Ban the user?',
+                    },
+                    alert_description : {
+                        delete : "After deleting the user, the user's data will not be restored",
+                        invited : "After inviting the user, the user's identity will change",
+                        ban : "After ban the user, the user will not be able to access the site",
+                    },
+                    msg_title : "",
+                    msg_description : "",
+                    api_tag : '',
+                    profile_id : '',
+
+
+                },
+                methods:{
+                    /*操作后，刷新页面*/
+                    action_result : function () {
+                      this.case_2 = !this.case_2
+                      window.location = "http://127.0.0.1:8000/m/userlistpanel/"
+                    },
+                    /*分配modal状态*/
+                    action_modal : function (tag,item_id) {
+                      if (tag == 1){
+                        /*tag=1 表示在操作delete*/
+                        this.msg_title = this.alert_title.delete
+                        this.msg_description = this.alert_description.delete
+                        this.api_tag = 1
+                        /*tag =2 表示在操作invited*/
+                      }else if (tag == 2) {
+                        this.msg_title = this.alert_title.invited
+                        this.msg_description = this.alert_description.invited
+                        this.api_tag = 2
+                        /*tag = 3 表示在操作ban*/
+                      }else if (tag == 3) {
+                        this.msg_title = this.alert_title.ban
+                        this.msg_description = this.alert_description.ban
+                        this.api_tag = 3
+                      };
+                      /*激活操作窗口，保存profile_id*/
+                      this.profile_id = item_id
+                      this.case_1 = true
+                    },
+
+                    /*分配调用哪个API*/
+                    action_api : function (id) {
+                      var api_url = ''
+                      var method_type = ''
+                      if (this.api_tag == 1){
+                        /*调用删除接口*/
+                        api_url = "http://127.0.0.1:8000/api/deleteuser/" + String(id)
+                        method_type = 'delete'
+                      }else if (this.api_tag == 2) {
+                        /*调用invited接口*/
+                        api_url = "http://127.0.0.1:8000/api/inviteduser/" + String(id)
+                        method_type = 'put'
+                      }else if (this.api_tag == 3) {
+                        /*调用ban接口*/
+                        api_url = "http://127.0.0.1:8000/api/banuser/" + String(id)
+                        method_type = 'put'
+                      }
+
+                      this.call_api(api_url,method_type)
+
+                    },
+                    /*通过分配的URL来实际调用接口*/
+                    call_api : function (api_url,method_type) {
+                      var self = this
+                      reqwest({
+                        url : api_url,
+                        type : 'json',
+                        method : method_type,
+                        headers:Cookies.get('token')? {'Authorization': 'Token ' + Cookies.get('token')}:{},
+                        success : function(resp){
+                          console.log('操作成功')
+                          self.case_1 = false
+                          self.case_2 = true
+                        },
+                        error : function (error) {
+                          console.log('操作失败')
+                          console.log(error.response)
+                        }
+
+                      })
+                    },
+                    /*关闭添加用户的弹窗*/
+                    modalSwitch:function () {
+                        this.modal.show = !this.modal.show
+                    },
+
+                    LoginOrNot:function(){
+                        /*如果当前是登录状态，执行退出登录的操作*/
+                        if (this.LOGIN == true){
+                          reqwest({
+                            url : "http://127.0.0.1:8000/api/logout/",
+                            method:"get",
+                            headers:Cookies.get('token')? {'Authorization': 'Token ' + Cookies.get('token')}:{},
+                            success : function(resp){
+                                Cookies.remove('token');
+                                console.log('token is delete');
+                                window.location = "http://127.0.0.1:8000/m/userlistpanel/login"
+                            },
+                            error : function (error) {
+                                console.log('退出失败');
+                                var error_resp = JSON.parse(error.response);
+                                console.log('错误是:',error_resp.msg);
+                            },
+                          });
+                        }else if (this.LOGIN == false) {
+                          /*如果是未登录状态，点击跳转到登录页*/
+                          window.location = "http://127.0.0.1:8000/m/userlistpanel/login"
+                        }
+
+                    },
+                    /*获取详情页路径*/
+                    get_user_detail_url : function(id){
+                      var detail_url = "http://127.0.0.1:8000/m/userdetail/?id=" + String(id);
+                      return (detail_url);
+                    },
+                    /*点击item进入到item的详情页*/
+                    showDetail : function(id){
+                      var user_detail_url = this.get_user_detail_url(id)
+                      window.location = user_detail_url;
+                      return false;
+                    },
+
+                    /*获取用户列表*/
+                    userList : function(){
+                        var self = this;
+                        reqwest({
+                          url : "http://127.0.0.1:8000/api/user/",
+                          type : 'json',
+                          method : 'get',
+                          headers:Cookies.get('token')? {'Authorization': 'Token ' + Cookies.get('token')}:{},
+                          success : function(resp){
+                              console.log('用户列表数据获取成功');
+                              for(var i = 0;i < resp.length;i++){
+                                resp[i].menushow = false;
+                                if (resp[i].identity == 'author'){
+
+                                  resp[i].identity = 'Inverted Author'
+
+                                }else if (resp[i].identity == 'normal') {
+
+                                  resp[i].identity = 'Normal'
+                                }
+                              };
+                              self.user_list = resp;
+                              console.log(self.user_list);
+                          },
+                          error : function(error){
+                             console.log('获取用户列表失败');
+                          },
+                        })
+                    },
+
+                    /*添加用户*/
+                    add_new_user : function () {
+                      var new_username = this.new_user.username;
+                      var new_password = this.new_user.password;
+                      var new_email = this.new_user.email;
+                      var new_identity = this.new_user.identity;
+                      /*调用接口*/
+                      var self = this;
+                      reqwest({
+                        url : 'http://127.0.0.1:8000/api/adduser/',
+                        type : 'json',
+                        method : 'post',
+                        headers:Cookies.get('token')? {'Authorization': 'Token ' + Cookies.get('token')}:{},
+                        data : {
+                          username : new_username,
+                          password : new_password,
+                          email : new_email,
+                          identity : new_identity,
+                        },
+                        success : function (resp) {
+                          console.log('用户添加成功');
+                          self.msg = "用户添加成功";
+                          self.modal.show = !self.modal.show
+                          self.case_2 = true
+                        },
+                        error : function (error) {
+                          console.log(error.response);
+                          self.msg = "用户添加失败";
+                        },
+                      });
+                    },
+
+                    /*删除用户*/
+                    delete_user : function (id) {
+                      var self = this;
+                      reqwest({
+                        url : 'http://127.0.0.1:8000/api/deleteuser/' + String(id),
+                        method : 'delete',
+                        type : 'json',
+                        headers:Cookies.get('token')? {'Authorization': 'Token ' + Cookies.get('token')}:{},
+                        success : function (resp) {
+                          console.log('删除成功');
+                          /*成功后刷新页面*/
+                          window.location = "http://127.0.0.1:8000/m/userlistpanel/";
+                        },
+                        error : function (error) {
+                          console.log('删除操作失败');
+                          console.log(error.response);
+                        },
+                      });
+                    },
+                },
+                computed:{
+
+                    canScroll:function () {
+                        if (this.modal.show) {
+                            return 'unscrollable'
+                        } else {
+                            return ''
+                        }
+                    },
+                    fadeInOut:function () {
+                        if (this.modal.show) {
+                            return ' fadeIn'
+                        } else {
+                            return ' fadeOut'
+                        }
+                    },
+                    loginOrNot : function () {
+                      if (this.LOGIN == true){
+                        return '退出'
+                      }else {
+                        return '请登录'
+                      }
+                    },
+                    /*根据登录状态，判断按钮是否可以点击*/
+                    ActiveOrDisabled : function () {
+                      if (this.LOGIN == true){
+                        return "orange"
+                      }else if (this.LOGIN == false) {
+                        return "disabled"
+                      }
+                    },
+
+                },
+                created:function (){
+                    console.log('token is :',Cookies.get('token'));
+                    var token = Cookies.get('token')
+                    if (token == undefined){
+                      console.log('用户没有登录')
+                      this.LOGIN = false
+                    }else{
+                      this.LOGIN = true
+                      this.userList();
+                    }
+                }
+
+            })
+        </script>
+    </body>
+    {% endverbatim %}
+</html>
